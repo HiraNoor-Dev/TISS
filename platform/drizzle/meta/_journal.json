@@ -1,0 +1,55 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1790012755307,
+      "tag": "0000_ambitious_mach_iv",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1790012783589,
+      "tag": "0001_foundation_integrity",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790056749172,
+      "tag": "0002_fearless_lila_cheney",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1790056925980,
+      "tag": "0003_classroom_integrity",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790072795398,
+      "tag": "0004_tidy_skullbuster",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790073007944,
+      "tag": "0005_remark_integrity",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790098148611,
+      "tag": "0006_illegal_killer_shrike",
+      "breakpoints": true
+    }
+  ]
+}

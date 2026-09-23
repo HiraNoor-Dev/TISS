@@ -1,0 +1,14 @@
+**/node_modules/
+**/.next/
+**/.next-preview/
+**/dist/
+**/coverage/
+**/*.tsbuildinfo
+**/.env*
+!**/.env.example
+**/*.db
+**/*.db-shm
+**/*.db-wal
+.local/
+docs/review/build-check/
+platform/.data/

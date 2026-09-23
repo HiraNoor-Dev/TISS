@@ -1,0 +1,23 @@
+import { spawnSync } from 'node:child_process';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { resolve, join } from 'node:path';
+import { createHash } from 'node:crypto';
+
+if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is not configured.');
+const connection = new URL(process.env.DATABASE_URL);
+if (!['localhost', '127.0.0.1', '[::1]'].includes(connection.hostname)) throw new Error('This helper is restricted to the local database.');
+const bin = process.env.PG_BIN ?? 'C:\\Program Files\\PostgreSQL\\18\\bin';
+const dump = join(bin, process.platform === 'win32' ? 'pg_dump.exe' : 'pg_dump');
+const restore = join(bin, process.platform === 'win32' ? 'pg_restore.exe' : 'pg_restore');
+if (!existsSync(dump) || !existsSync(restore)) throw new Error('Set PG_BIN to the installed PostgreSQL bin directory.');
+const directory = resolve('../.local/backups', new Date().toISOString().replace(/[:.]/g, '-'));
+mkdirSync(directory, { recursive: true });
+const archive = join(directory, 'tiss-platform.dump');
+const env = { ...process.env, PGHOST: connection.hostname, PGPORT: connection.port || '5432', PGDATABASE: decodeURIComponent(connection.pathname.slice(1)), PGUSER: decodeURIComponent(connection.username), PGPASSWORD: decodeURIComponent(connection.password) };
+const result = spawnSync(dump, ['--format=custom', '--no-owner', '--no-acl', '--file', archive], { env, windowsHide: true, encoding: 'utf8' });
+if (result.error || result.status !== 0) throw new Error(`Local backup failed (exit ${result.status ?? 'unavailable'}). No migration was performed by this helper.`);
+const check = spawnSync(restore, ['--list', archive], { windowsHide: true, encoding: 'utf8' });
+if (check.error || check.status !== 0) throw new Error('Backup archive listing verification failed.');
+writeFileSync(join(directory, 'SHA256.txt'), `${createHash('sha256').update(readFileSync(archive)).digest('hex')}  tiss-platform.dump\n`);
+console.log(`Backup archive created and listing verified: ${archive}`);
+console.log('Archive listing verification is not a full restore test.');
