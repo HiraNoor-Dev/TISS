@@ -93,7 +93,7 @@ test('Academic administration: configuration, scoped students and historical enr
       assert.equal((await students.list(admin, { page: 1, query: '%' })).length, 0);
     });
     await t.test('guardians support one primary and shared sibling contacts without cross-class edits', async () => {
-      const contact = { fullName: 'Parent One', phone: '+923001234567', whatsapp: '', relationship: 'Mother', isPrimary: true };
+      const contact = { fullName: 'Parent One', phone: '+923001234567', whatsapp: '', whatsappConsent: false, relationship: 'Mother', isPrimary: true };
       await students.addGuardian(teacher, pupil.id, contact, classA.id);
       const [first] = (await students.details(admin, pupil.id)).guardians;
       await students.addGuardian(admin, sibling.id, { guardianId: first.guardianId, relationship: 'Mother', isPrimary: true });

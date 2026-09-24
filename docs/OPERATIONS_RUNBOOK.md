@@ -1,8 +1,8 @@
 # Operations and school handover
 
-## Scope agreed on 22 September 2026
+## Current scope
 
-The new `platform/` application is the delivery target. Do not import the old prototype data. WhatsApp remains paused. Online hosting is deliberately deferred until application finalization; the application is not yet deployed or pilot-approved.
+The new `platform/` application is the delivery target. Do not import the old prototype data. WhatsApp result delivery is implemented and stays disabled until Meta Business onboarding is complete. Online hosting is deliberately deferred; the application is not yet deployed or pilot-approved.
 
 ## Routine administration
 
@@ -10,9 +10,10 @@ The new `platform/` application is the delivery target. Do not import the old pr
 2. Create teacher accounts with temporary credentials. Assign subjects and a class incharge. Users must change their temporary password before accessing records.
 3. Add students and dated enrollments; link guardians and choose the primary contact. Provision student logins only when needed.
 4. Teachers enter tests/marks, attendance and observations in their assigned class workspace. Review pending remarks as administrator or incharge. Edits revoke earlier approval.
-5. Reports provide staff, student and parent views. Parent summaries contain only approved parent-visible remarks; private observations remain staff-only. Attendance counts describe saved sheets, not a presumed school calendar.
-6. Use **Activity & corrections** to review changes or correct a saved mark, attendance entry or observation. Choose its original class/date and supply a reason. A stale sheet must be reloaded. Original authors and enrollments remain unchanged, including prior years.
-7. Correct names using Edit. Delete only unused configuration; deactivate/revoke records that have history. Close/replace dated enrollments for transfers. Never edit the database to bypass history restrictions.
+5. Record a primary guardian's WhatsApp number and consent before messaging. Saving marks does not send anything. After every student has a result, only the teacher who created that test can confirm **Publish & send results**. Corrections create a separate correction batch.
+6. Reports provide staff, student and parent views. Parent summaries contain only approved parent-visible remarks; private observations remain staff-only. Attendance counts describe saved sheets, not a presumed school calendar.
+7. Use **Activity & corrections** to review changes or correct a saved mark, attendance entry or observation. Choose its original class/date and supply a reason. A stale sheet must be reloaded. Original authors and enrollments remain unchanged, including prior years.
+8. Correct names using Edit. Delete only unused configuration; deactivate/revoke records that have history. Close/replace dated enrollments for transfers. Never edit the database to bypass history restrictions.
 
 Verify a requester's identity through the school's known contact channel before resetting their password. Do not share passwords in reports, logs or messaging groups. The administrator must maintain access to a working account; the application intentionally does not expose deletion of the active administrator.
 
@@ -33,6 +34,8 @@ Use separate staging and production databases. Run migrations with an owner/migr
 Set DATABASE_URL, APP_ORIGIN (exact HTTPS origin) and a random AUTH_RATE_SECRET of at least 32 characters as hosting secrets. Configure certificate-validated database TLS and HTTPS proxying. Do not disable Secure cookies or origin checks. Add trusted-proxy source rate limiting and monitor failed login volume, 5xx responses, database capacity and backup failures. Run `npm run maintenance` daily through the host scheduler; it deletes only expired sessions and old login-throttle buckets, not school records or audits.
 
 Run `npm ci`, `npm test`, `npm run typecheck`, `npm run build`, migrations, then `npm run start`. The app defaults to port 3100. Smoke-test login, forced password change, role restrictions, a synthetic class workflow and report audience boundaries in staging before directing school traffic to production. Do not use synthetic preview credentials or copy `.env.local` into source control.
+
+For WhatsApp deployment, follow `WHATSAPP_STATUS.md`. The web application and `npm run whatsapp:worker` must run against the same database. Keep the worker alive with the hosting provider's process manager, expose `/api/whatsapp/webhook` over HTTPS, and monitor failed or uncertain recipients. Never manually requeue an uncertain delivery without checking Meta because it may already have been accepted.
 
 ## One-class acceptance pilot
 

@@ -10,7 +10,7 @@ import { activeClass, audit, dateInput, schoolToday, type Store } from './academ
 
 const fullName = z.string().trim().min(1).max(120);
 const phone = z.string().trim().regex(/^\+[1-9]\d{7,14}$/, 'Use an international number such as +923001234567.');
-const guardianFields = z.object({ fullName, phone, whatsapp: z.union([phone, z.literal('')]).transform(v => v || null), relationship: z.string().trim().min(1).max(60), isPrimary: z.boolean() }).strict();
+const guardianFields = z.object({ fullName, phone, whatsapp: z.union([phone, z.literal('')]).transform(v => v || null), whatsappConsent: z.boolean(), relationship: z.string().trim().min(1).max(60), isPrimary: z.boolean() }).strict().refine(v => !v.whatsappConsent || Boolean(v.whatsapp), { path: ['whatsappConsent'], message: 'Enter a WhatsApp number before recording consent.' });
 const linkGuardianFields = z.object({ guardianId: uuid, relationship: z.string().trim().min(1).max(60), isPrimary: z.boolean() }).strict();
 const profileFields = { id: s.students.id, portalId: s.students.portalId, fullName: s.students.fullName, status: s.students.status, userId: s.students.userId };
 const dayBefore = (date: string) => new Date(new Date(`${date}T00:00:00Z`).getTime() - 86400000).toISOString().slice(0, 10);
@@ -55,7 +55,7 @@ export function studentManagementService(db: Database, today = schoolToday) {
       db.select({ id: s.enrollments.id, academicClassId: s.enrollments.academicClassId, startsOn: s.enrollments.startsOn, endsOn: s.enrollments.endsOn, year: s.academicYears.name, yearEndsOn: s.academicYears.endsOn, grade: s.grades.name, section: s.sections.name }).from(s.enrollments)
         .innerJoin(s.academicClasses, eq(s.academicClasses.id, s.enrollments.academicClassId)).innerJoin(s.academicYears, eq(s.academicYears.id, s.academicClasses.academicYearId)).innerJoin(s.sections, eq(s.sections.id, s.academicClasses.sectionId)).innerJoin(s.grades, eq(s.grades.id, s.sections.gradeId))
         .where(eq(s.enrollments.studentId, id)).orderBy(desc(s.enrollments.startsOn)),
-      db.select({ linkId: s.studentGuardians.id, guardianId: s.guardians.id, fullName: s.guardians.fullName, phone: s.guardians.phone, whatsapp: s.guardians.whatsapp, relationship: s.studentGuardians.relationship, isPrimary: s.studentGuardians.isPrimary }).from(s.studentGuardians).innerJoin(s.guardians, eq(s.guardians.id, s.studentGuardians.guardianId)).where(eq(s.studentGuardians.studentId, id)).orderBy(desc(s.studentGuardians.isPrimary), s.guardians.fullName),
+      db.select({ linkId: s.studentGuardians.id, guardianId: s.guardians.id, fullName: s.guardians.fullName, phone: s.guardians.phone, whatsapp: s.guardians.whatsapp, whatsappOptInAt: s.guardians.whatsappOptInAt, relationship: s.studentGuardians.relationship, isPrimary: s.studentGuardians.isPrimary }).from(s.studentGuardians).innerJoin(s.guardians, eq(s.guardians.id, s.studentGuardians.guardianId)).where(eq(s.studentGuardians.studentId, id)).orderBy(desc(s.studentGuardians.isPrimary), s.guardians.fullName),
     ]);
     return { ...student, history, guardians };
   }
@@ -146,7 +146,7 @@ export function studentManagementService(db: Database, today = schoolToday) {
       } else {
         const [existing] = await tx.select({ id: s.guardians.id }).from(s.guardians).where(and(eq(s.guardians.phone, data.phone), sql`lower(${s.guardians.fullName}) = lower(${data.fullName})`)).limit(1);
         if (existing) throw new AppError(409, 'This guardian already exists. Ask an administrator to link the existing guardian.');
-        const [created] = await tx.insert(s.guardians).values({ fullName: data.fullName, phone: data.phone, whatsapp: data.whatsapp }).returning();
+        const [created] = await tx.insert(s.guardians).values({ fullName: data.fullName, phone: data.phone, whatsapp: data.whatsapp, whatsappOptInAt: data.whatsappConsent ? new Date() : null }).returning();
         guardianId = created.id; await audit(tx, actor, 'guardian.created', created.id, null, created);
       }
       if (data.isPrimary) await clearPrimary(tx, actor, id);
@@ -163,11 +163,12 @@ export function studentManagementService(db: Database, today = schoolToday) {
       if (!link) throw new AppError(404, 'Guardian relationship not found.');
       const [old] = await tx.select().from(s.guardians).where(eq(s.guardians.id, link.guardianId)).for('update');
       const shared = await tx.select({ studentId: s.studentGuardians.studentId }).from(s.studentGuardians).where(eq(s.studentGuardians.guardianId, link.guardianId)).limit(2);
-      const contactChanged = old.fullName !== data.fullName || old.phone !== data.phone || old.whatsapp !== data.whatsapp;
+      const contactChanged = old.fullName !== data.fullName || old.phone !== data.phone || old.whatsapp !== data.whatsapp || Boolean(old.whatsappOptInAt) !== data.whatsappConsent;
       if (shared.length > 1 && actor.role !== 'admin' && contactChanged) throw new AppError(403, 'A shared guardian contact must be changed by an administrator. You can still update this student’s relationship or primary contact.');
       const [duplicate] = await tx.select({ id: s.guardians.id }).from(s.guardians).where(and(eq(s.guardians.phone, data.phone), sql`lower(${s.guardians.fullName}) = lower(${data.fullName})`, sql`${s.guardians.id} <> ${old.id}`)).limit(1);
       if (duplicate) throw new AppError(409, 'This guardian already exists. Link the existing contact instead of duplicating it.');
-      await tx.update(s.guardians).set({ fullName: data.fullName, phone: data.phone, whatsapp: data.whatsapp }).where(eq(s.guardians.id, old.id));
+      const whatsappOptInAt = data.whatsappConsent ? (old.whatsapp === data.whatsapp && old.whatsappOptInAt ? old.whatsappOptInAt : new Date()) : null;
+      await tx.update(s.guardians).set({ fullName: data.fullName, phone: data.phone, whatsapp: data.whatsapp, whatsappOptInAt }).where(eq(s.guardians.id, old.id));
       if (data.isPrimary) await clearPrimary(tx, actor, id);
       await tx.update(s.studentGuardians).set({ relationship: data.relationship, isPrimary: data.isPrimary }).where(eq(s.studentGuardians.id, linkId));
       await audit(tx, actor, 'guardian.updated', old.id, { ...old, studentId: id, linkId, relationship: link.relationship, isPrimary: link.isPrimary }, { ...data, studentId: id, linkId });

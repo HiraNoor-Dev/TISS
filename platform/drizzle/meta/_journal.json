@@ -50,6 +50,13 @@
       "when": 1790098148611,
       "tag": "0006_illegal_killer_shrike",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790222239580,
+      "tag": "0007_brown_abomination",
+      "breakpoints": true
     }
   ]
 }

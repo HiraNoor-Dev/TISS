@@ -100,5 +100,42 @@ function SheetEditor({ data, mode, path, reload, dirty, saving }: { data: Marks 
     })}</div></fieldset>
     {error && <p role="alert" className="error mt-4">{error}</p>}{message && <p role="status" className="success mt-4">{message}</p>}
     <div className="actions sheet-save"><button disabled={busy || !rows.length}>{busy ? 'Saving…' : `Save ${mode}`}</button><button type="button" className="secondary" disabled={busy} onClick={() => { if (!changed || window.confirm('Discard your unsaved changes and reload the latest records?')) { dirty(false); reload(); } }}>Reload latest</button></div>
+    {mode === 'marks' && test && <WhatsAppResults key={version} path={`${path}/whatsapp`} version={version} unsaved={changed} />}
   </form>;
+}
+
+type Communication = {
+  configured: boolean; rosterCount: number; sendableCount: number;
+  missing: { studentId: string; portalId: string; fullName: string; reason: string }[];
+  latest: null | { id: string; assessmentVersion: number; kind: 'initial' | 'correction'; status: string; total: number; counts: Record<string, number>; createdAt: string };
+};
+function WhatsAppResults({ path, version, unsaved }: { path: string; version: number; unsaved: boolean }) {
+  const remote = useRemote<Communication>(`/api/${path}`); const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [message, setMessage] = useState('');
+  const data = remote.data; const alreadyQueued = data?.latest?.assessmentVersion === version;
+  async function action(kind: 'queue' | 'retry') {
+    if (!data || busy) return;
+    const question = kind === 'queue' ? `Send this ${data.latest ? 'corrected result' : 'result'} privately to ${data.sendableCount} primary WhatsApp guardians?` : `Retry ${data.latest?.counts.failed ?? 0} messages that WhatsApp definitely marked failed?`;
+    if (!window.confirm(question)) return;
+    setBusy(true); setError(''); setMessage('');
+    try {
+      if (kind === 'queue') await mutate(path, { version });
+      else await mutate(`${path}/${data.latest!.id}/retry`, {});
+      setMessage(kind === 'queue' ? 'Message batch queued. Delivery status will update as the worker and WhatsApp process it.' : 'Failed messages queued for retry.'); remote.reload();
+    } catch (e) { setError(e instanceof Error ? e.message : 'Unable to queue messages.'); }
+    finally { setBusy(false); }
+  }
+  return <section className="card mt-6 stack"><div><h2>WhatsApp result delivery</h2><p className="muted">Nothing is sent until the teacher who created this test confirms this button. Each primary guardian receives only their own student’s result.</p></div>
+    <LoadState {...remote} retry={remote.reload} />
+    {data && <><p>{data.sendableCount} of {data.rosterCount} students are ready for WhatsApp.</p>
+      {!data.configured && <p className="error">WhatsApp is disabled until the administrator connects the school’s Meta Business account.</p>}
+      {data.missing.length > 0 && <details><summary>{data.missing.length} students need attention before sending</summary>{data.missing.map(row => <p className="muted text-sm" key={row.studentId}>{row.portalId} · {row.fullName} — {row.reason}</p>)}</details>}
+      {data.latest && <div><p><strong>Latest {data.latest.kind} batch:</strong> {data.latest.status} · {data.latest.total} recipients</p><p className="muted text-sm">Accepted {data.latest.counts.accepted ?? 0} · Sent {data.latest.counts.sent ?? 0} · Delivered {data.latest.counts.delivered ?? 0} · Read {data.latest.counts.read ?? 0} · Failed {data.latest.counts.failed ?? 0} · Uncertain {data.latest.counts.uncertain ?? 0}</p></div>}
+      {unsaved && <p className="error">Save the latest marks before sending.</p>}
+      {error && <p role="alert" className="error">{error}</p>}{message && <p role="status" className="success">{message}</p>}
+      <div className="actions"><button type="button" disabled={busy || unsaved || !data.configured || data.missing.length > 0 || alreadyQueued || data.rosterCount === 0} onClick={() => action('queue')}>{alreadyQueued ? 'Current results already queued' : data.latest ? 'Publish & send corrected results' : 'Publish & send results'}</button>
+        {(data.latest?.counts.failed ?? 0) > 0 && <button type="button" className="secondary" disabled={busy} onClick={() => action('retry')}>Retry definite failures</button>}
+        <button type="button" className="secondary" disabled={busy} onClick={remote.reload}>Refresh delivery status</button></div>
+      {(data.latest?.counts.uncertain ?? 0) > 0 && <p className="muted text-sm">Uncertain messages are not retried automatically because the provider may have accepted them before the connection failed.</p>}
+    </>}
+  </section>;
 }

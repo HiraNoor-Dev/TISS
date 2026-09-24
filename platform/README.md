@@ -17,17 +17,18 @@ This is the application built from the approved refined plan. The original proto
 - Student creation/search, guardian relationships and primary contacts, existing guardian linking for siblings, dated enrollment/promotion history and student lifecycle changes. Current incharges manage only their assigned students; administrators handle enrollment changes and shared contact edits.
 - Student account provisioning links an existing active student profile by portal ID, preserving identity and history. Departure/inactive status closes enrollment and disables the linked login.
 - Teacher class workspace with subject-scoped tests and bulk marks (Present/Absent/Not Attempted), daily attendance (Present/Absent/Leave), and intentional observations with categories, ratings and optional notes.
+- Teacher-confirmed WhatsApp result delivery through Meta's Cloud API. Saving marks never sends automatically. The test's teacher reviews readiness and clicks **Publish & send results**; each consented primary guardian receives only that student's result, and later mark versions use a correction template.
 - Complete dated bulk rosters up to 1,000 students, transactional validation, audited changes, database enrollment/marks integrity, retry-safe test creation, and sheet versions that reject stale edits. Any assigned teacher can enter attendance, as requested by the user.
 
 ## Final additions and agreed exclusions
 
 Reports include student/staff/parent views, class marks and attendance, approved remarks and staff-only observation history with date/month/year filters. Administrator Activity & corrections provides paginated audit history, operational counts and reason-required corrections of saved marks, attendance and observations, with stale-write protection and retained author/enrollment history.
 
-WhatsApp remains paused. Online deployment, provider backup scheduling and the real-school pilot are deferred until application acceptance. Old prototype data is excluded. See `../docs/OPERATIONS_RUNBOOK.md` and `../docs/SESSION_CHECKPOINT.md` for current verification and handover status.
+WhatsApp support is implemented but remains disabled until the school connects and approves its Meta Business account, templates and consent process. Online deployment, provider backup scheduling and the real-school pilot are deferred until application acceptance. Old prototype data is excluded. See `../docs/WHATSAPP_STATUS.md`, `../docs/OPERATIONS_RUNBOOK.md` and `../docs/SESSION_CHECKPOINT.md`.
 
 ## Local setup
 
-Reporting update: Dashboard → Reports now provides student overall reports, class marks/attendance, staff observation history and audience-approved remarks with year/month/custom date filters. Parent report preview is implemented; WhatsApp sharing remains paused. See `../docs/REPORTING_STATUS.md` for current behavior and limits.
+Reporting update: Dashboard → Reports provides student overall reports, class marks/attendance, staff observation history and audience-approved remarks with year/month/custom date filters. Parent report preview is implemented. WhatsApp sends individual test results from the test marks screen after explicit teacher confirmation.
 
 Requires Node.js 22 or later and a PostgreSQL database dedicated to this application. Local PostgreSQL 18 is configured on the implementation machine. The user verified login, initial password change, teacher account creation and deactivation. Automated integration tests use isolated PGlite databases; hosted deployment verification is still pending.
 
@@ -47,9 +48,9 @@ npm test
 npm run build
 ```
 
-The integration suite applies the actual SQL migrations to fresh in-memory PostgreSQL-compatible databases. It tests production services and HTTP handlers with real queries and synthetic records. It does not write test records to the local school database or open the old SQLite database. Coverage includes sessions, contextual permissions, password/account lifecycle, origin/validation checks, transaction rollback, immutable audits, academic configuration, guardian sharing, profile/account linking, promotion history and classroom workflows with 501 synthetic students. The Node runner reports 36 tests including four parent groups.
+The integration suite applies the actual SQL migrations to fresh in-memory PostgreSQL-compatible databases. It tests production services and HTTP handlers with real queries and synthetic records. It does not write test records to the local school database or open the old SQLite database. Coverage includes sessions, contextual permissions, password/account lifecycle, origin/validation checks, transaction rollback, immutable audits, academic configuration, guardian sharing, profile/account linking, promotion history and classroom workflows with 501 synthetic students. The Node runner reports 38 tests, including consent, teacher ownership, correction batches, delivery webhooks, retry rules and immutable message snapshots.
 
-PGlite does not verify network authentication, TLS, multi-connection PostgreSQL concurrency, managed backups or production deployment configuration. Test these on the target PostgreSQL instance before a pilot. The full report/communication workflow is not complete yet; classroom entry can now be checked with configured teacher accounts.
+PGlite does not verify network authentication, TLS, multi-connection PostgreSQL concurrency, managed backups or production deployment configuration. Test these on the target PostgreSQL instance before a pilot. External Meta credentials, approved message templates and a public HTTPS webhook must be configured during deployment before live messages can be tested.
 
 ## Database operations
 

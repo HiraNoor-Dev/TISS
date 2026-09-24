@@ -11,6 +11,7 @@ import { remarkService } from './remarks';
 import { reportService } from './reports';
 import { activityService } from './activity';
 import { correctionService } from './corrections';
+import { whatsappConfig, whatsappService } from './whatsapp';
 
 export const cookieName = (production: boolean) => production ? '__Host-tiss_session' : 'tiss_session';
 export function sessionCookie(token: string, production: boolean, clear = false) {
@@ -48,6 +49,7 @@ export function apiHandler(db: Database, config: { origin: string; rateSecret: s
   const reports = reportService(db);
   const activity = activityService(db);
   const corrections = correctionService(db);
+  const whatsapp = whatsappService(db, whatsappConfig());
   return async (request: Request, segments: string[]): Promise<Response> => {
     const reply = (body: unknown, status = 200, cookie?: string) => Response.json(body, { status, headers: { 'Cache-Control': 'no-store', ...(cookie ? { 'Set-Cookie': cookie } : {}) } });
     try {
@@ -96,6 +98,11 @@ export function apiHandler(db: Database, config: { origin: string; rateSecret: s
         if (segments.length === 4 && segments[2] === 'tests') {
           if (method === 'GET') return reply(await classroom.marks(actor, classId, segments[3]));
           if (method === 'POST') return reply(await classroom.saveMarks(actor, classId, segments[3], body));
+        }
+        if (segments.length >= 5 && segments[2] === 'tests' && segments[4] === 'whatsapp') {
+          if (segments.length === 5 && method === 'GET') return reply(await whatsapp.preview(actor, classId, segments[3]));
+          if (segments.length === 5 && method === 'POST') return reply({ dispatch: await whatsapp.queue(actor, classId, segments[3], body) }, 202);
+          if (segments.length === 7 && segments[6] === 'retry' && method === 'POST') return reply(await whatsapp.retryFailed(actor, classId, segments[3], segments[5]));
         }
         if (segments.length === 3 && segments[2] === 'attendance') {
           if (method === 'GET') return reply(await classroom.attendance(actor, classId, params.get('date') ?? ''));

@@ -15,6 +15,8 @@
     "db:backup:local": "tsx --env-file-if-exists=.env.local scripts/backup-local.ts",
     "db:verify-restore": "tsx scripts/verify-restore.ts",
     "maintenance": "tsx --env-file-if-exists=.env.local scripts/maintenance.ts",
+    "whatsapp:worker": "tsx --env-file-if-exists=.env.local scripts/whatsapp-worker.ts",
+    "whatsapp:work-once": "tsx --env-file-if-exists=.env.local scripts/whatsapp-worker.ts --once",
     "admin:create": "tsx --env-file-if-exists=.env.local scripts/create-admin.ts",
     "verify:local": "tsx --env-file-if-exists=.env.local scripts/verify-local.ts"
   },

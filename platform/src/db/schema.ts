@@ -26,8 +26,8 @@ export const students = pgTable('students', {
 }, t => [check('portal_id_canonical', sql`${t.portalId} = upper(trim(${t.portalId})) AND length(${t.portalId}) BETWEEN 3 AND 64`)]);
 export const guardians = pgTable('guardians', {
   id: id(), fullName: text('full_name').notNull(), phone: text('phone').notNull(),
-  whatsapp: text('whatsapp'), createdAt: created(),
-});
+  whatsapp: text('whatsapp'), whatsappOptInAt: timestamp('whatsapp_opt_in_at', { withTimezone: true }), createdAt: created(),
+}, t => [check('guardian_whatsapp_consent', sql`${t.whatsappOptInAt} IS NULL OR ${t.whatsapp} IS NOT NULL`)]);
 export const studentGuardians = pgTable('student_guardians', {
   id: id(), studentId: uuid('student_id').notNull().references(() => students.id, { onDelete: 'restrict' }),
   guardianId: uuid('guardian_id').notNull().references(() => guardians.id, { onDelete: 'restrict' }),
@@ -107,6 +107,35 @@ export const testResults = pgTable('test_results', {
   status: resultStatus('status').notNull(), marks: numeric('marks', { precision: 8, scale: 2, mode: 'number' }),
   updatedBy: uuid('updated_by').notNull().references(() => users.id, { onDelete: 'restrict' }), updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, t => [uniqueIndex('one_result_per_test_student').on(t.assessmentId, t.studentId), check('result_status_marks', sql`(${t.status} = 'present' AND ${t.marks} IS NOT NULL AND ${t.marks} >= 0) OR (${t.status} <> 'present' AND ${t.marks} IS NULL)`)]);
+
+export const whatsappDispatchStatus = pgEnum('whatsapp_dispatch_status', ['queued', 'processing', 'completed', 'partial', 'failed']);
+export const whatsappRecipientStatus = pgEnum('whatsapp_recipient_status', ['queued', 'processing', 'accepted', 'sent', 'delivered', 'read', 'failed', 'uncertain']);
+export const whatsappDispatchKind = pgEnum('whatsapp_dispatch_kind', ['initial', 'correction']);
+export const resultDispatches = pgTable('result_dispatches', {
+  id: id(), assessmentId: uuid('assessment_id').notNull().references(() => assessments.id, { onDelete: 'restrict' }),
+  assessmentVersion: integer('assessment_version').notNull(), kind: whatsappDispatchKind('kind').notNull(),
+  triggeredBy: uuid('triggered_by').notNull().references(() => teachers.userId, { onDelete: 'restrict' }),
+  status: whatsappDispatchStatus('status').notNull().default('queued'), templateName: text('template_name').notNull(),
+  templateLanguage: text('template_language').notNull(), createdAt: created(), completedAt: timestamp('completed_at', { withTimezone: true }),
+}, t => [
+  uniqueIndex('one_dispatch_per_assessment_version').on(t.assessmentId, t.assessmentVersion), index('dispatch_status_created').on(t.status, t.createdAt),
+  check('dispatch_version_nonnegative', sql`${t.assessmentVersion} >= 0`),
+]);
+export const resultDispatchRecipients = pgTable('result_dispatch_recipients', {
+  id: id(), dispatchId: uuid('dispatch_id').notNull().references(() => resultDispatches.id, { onDelete: 'restrict' }),
+  studentId: pupilId(), guardianId: uuid('guardian_id').notNull().references(() => guardians.id, { onDelete: 'restrict' }),
+  recipientPhone: text('recipient_phone').notNull(), studentName: text('student_name').notNull(), guardianName: text('guardian_name').notNull(),
+  resultStatus: resultStatus('result_status').notNull(), marks: numeric('marks', { precision: 8, scale: 2, mode: 'number' }),
+  totalMarks: numeric('total_marks', { precision: 8, scale: 2, mode: 'number' }).notNull(),
+  status: whatsappRecipientStatus('status').notNull().default('queued'), providerMessageId: text('provider_message_id').unique(),
+  errorCode: text('error_code'), errorDetail: text('error_detail'), attemptCount: integer('attempt_count').notNull().default(0),
+  lastAttemptAt: timestamp('last_attempt_at', { withTimezone: true }), statusUpdatedAt: timestamp('status_updated_at', { withTimezone: true }).notNull().defaultNow(), createdAt: created(),
+}, t => [
+  uniqueIndex('one_dispatch_per_student').on(t.dispatchId, t.studentId), index('recipient_send_queue').on(t.status, t.createdAt),
+  check('dispatch_recipient_phone', sql`${t.recipientPhone} ~ '^\\+[1-9][0-9]{7,14}$'`),
+  check('dispatch_recipient_result', sql`(${t.resultStatus} = 'present' AND ${t.marks} IS NOT NULL AND ${t.marks} >= 0 AND ${t.marks} <= ${t.totalMarks}) OR (${t.resultStatus} <> 'present' AND ${t.marks} IS NULL)`),
+  check('dispatch_recipient_attempts', sql`${t.attemptCount} >= 0 AND ${t.totalMarks} > 0`),
+]);
 export const attendanceSheets = pgTable('attendance_sheets', {
   id: id(), academicClassId: classroomId(), onDate: date('on_date').notNull(), authorId: authorId(), version: integer('version').notNull().default(0), createdAt: created(),
 }, t => [uniqueIndex('daily_class_attendance').on(t.academicClassId, t.onDate)]);

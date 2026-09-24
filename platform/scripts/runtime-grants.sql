@@ -11,6 +11,7 @@ GRANT SELECT, INSERT, UPDATE ON
   academic_years, divisions, grades, sections, academic_classes, subjects,
   enrollments, teaching_assignments, incharge_assignments,
   sessions, login_buckets, assessments, test_results,
+  result_dispatches, result_dispatch_recipients,
   attendance_sheets, attendance_records, observation_sheets, observation_records, remarks
 TO tiss_runtime;
 GRANT DELETE ON sessions, login_buckets, users, teachers,
